@@ -46,8 +46,6 @@ MAP = ExternalMapping()
 # resources
 for resource in projclient.data["resources"]:
     resFriendlyName = resource["name"].split()[0]
-    if resFriendlyName == "Md":
-        resFriendlyName = resource["name"].split()[1]
     r = ps.Worker(resFriendlyName if OPTIONS['friendly_names'] else resource['id'])
     MAP.resources[resource["id"]] = r
 
