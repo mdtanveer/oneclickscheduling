@@ -38,7 +38,7 @@ class ProjectClient:
                 "links": None
                 }
         self.data_filters = {
-                "tasks": "/?$select=name,duration,index,summary",
+                "tasks": "/?$select=name,duration,index,summary,start,finish",
                 "resources": None,
                 "assignments": "/?$select=taskId,resourceId",
                 "links": "/?$select=driver,predecessorId,successorId,linkType"
@@ -169,7 +169,7 @@ class ProjectClient:
             )
 
 def fetch_full_data():
-    proj_client = ProjectClient("14c39a2e-7998-4dca-83b4-1d13c2fa39e6", "https://msdefault.crm.dynamics.com")
+    proj_client = ProjectClient("db2d4342-5e25-48e2-8755-f9bfd4e6e3fe", "https://msdefault.crm.dynamics.com")
     proj_client.fetch_full_data()
     return proj_client
 

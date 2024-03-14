@@ -8,7 +8,7 @@ OPTIONS = {'friendly_names': True}
 
 projclient = fetch_full_data()
 
-pb_bs = ps.SchedulingProblem("1-click scheduling")#,
+pb_bs = ps.SchedulingProblem(name="1-click scheduling")#,
         #delta_time=timedelta(days=1),
         #start_time = datetime.now())
 
@@ -45,28 +45,28 @@ MAP = ExternalMapping()
 
 # resources
 for resource in projclient.data["resources"]:
-    resFriendlyName = resource["name"].split()[0]
-    r = ps.Worker(resFriendlyName if OPTIONS['friendly_names'] else resource['id'])
+    resFriendlyName = resource["name"].rsplit(' ', 1)[0]
+    r = ps.Worker(name=resFriendlyName if OPTIONS['friendly_names'] else resource['id'])
     MAP.resources[resource["id"]] = r
 
 # tasks
 for task in projclient.data["tasks"]:
     taskname = task['name'] if OPTIONS['friendly_names'] else task['id']
-    t = ps.FixedDurationTask(taskname, duration=int(int(task['duration'])/28800))
+    t = ps.FixedDurationTask(name=taskname, duration=int(int(task['duration'])/28800))
     MAP.tasks[task['id']] = t
-    t.add_required_resource(ps.SelectWorkers(MAP.resources.values(), 1))
+    t.add_required_resource(ps.SelectWorkers(list_of_workers=MAP.resources.values(), nb_workers_to_select=1))
 
 # dependencies
 for link in projclient.data["links"]:
     predessorTask = MAP.tasks[link['predecessorId']]    
     successorTask = MAP.tasks[link['successorId']]    
-    ps.TaskPrecedence(predessorTask, successorTask, kind='tight')
+    ps.TaskPrecedence(task_before=predessorTask, task_after=successorTask, kind='tight')
 
 # add makespan objective
-pb_bs.add_objective_makespan()
+ps.ObjectiveMinimizeMakespan()
 
 # plot solution
-solver = ps.SchedulingSolver(pb_bs)
+solver = ps.SchedulingSolver(problem=pb_bs)
 solution = solver.solve()
 
 if not OPTIONS["friendly_names"]:
@@ -88,8 +88,8 @@ if not OPTIONS["friendly_names"]:
         # "2023-09-21T16:00:00.000Z"
         projclient.update_task(task_start["taskId"], {'start': start.strftime("%Y-%m-%dT16:00:00.000Z")})
 else:
-    print(solution.to_json_string())
-    solution.render_gantt_matplotlib()
+    print(solution)
+    ps.render_gantt_matplotlib(solution)
 
 
 
