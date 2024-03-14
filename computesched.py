@@ -40,6 +40,7 @@ class ExternalMapping:
     def __init__(self):
         self.tasks = {}
         self.resources = {}
+        self.assignments = {}
 
 MAP = ExternalMapping()
 
@@ -54,13 +55,30 @@ for task in projclient.data["tasks"]:
     taskname = task['name'] if OPTIONS['friendly_names'] else task['id']
     t = ps.FixedDurationTask(name=taskname, duration=int(int(task['duration'])/28800))
     MAP.tasks[task['id']] = t
-    t.add_required_resource(ps.SelectWorkers(list_of_workers=MAP.resources.values(), nb_workers_to_select=1))
+    #t.add_required_resource(ps.SelectWorkers(list_of_workers=MAP.resources.values(), nb_workers_to_select=1))
 
 # dependencies
 for link in projclient.data["links"]:
     predessorTask = MAP.tasks[link['predecessorId']]    
     successorTask = MAP.tasks[link['successorId']]    
     ps.TaskPrecedence(task_before=predessorTask, task_after=successorTask, kind='tight')
+
+# assignments
+for assignment in projclient.data["assignments"]:
+    taskId = assignment['taskId']    
+    resource = MAP.resources[assignment['resourceId']]    
+    if taskId in MAP.assignments.keys():
+        MAP.assignments[taskId].append(resource)
+    else:
+        MAP.assignments[taskId] = [resource]
+for taskId in MAP.assignments.keys():
+    task = MAP.tasks[taskId]
+    if len(MAP.assignments[taskId]) > 1:
+        task.add_required_resource(ps.SelectWorkers(list_of_workers=MAP.assignments[taskId], nb_workers_to_select=1))
+    elif len(MAP.assignments[taskId]) == 1:
+        task.add_required_resource(MAP.assignments[taskId][0])
+    else:
+        task.add_required_resource(ps.SelectWorkers(list_of_workers=MAP.resources.values(), nb_workers_to_select=1))
 
 # add makespan objective
 ps.ObjectiveMinimizeMakespan()
@@ -70,7 +88,7 @@ solver = ps.SchedulingSolver(problem=pb_bs)
 solution = solver.solve()
 
 if not OPTIONS["friendly_names"]:
-    task_solution = json.loads(solution.to_json_string())
+    task_solution = json.loads(solution.to_json())
 
     assignments = jmespath.search('tasks.*.{taskId: name, resId: assigned_resources[0]}', task_solution)
     for assignment in assignments:
@@ -88,7 +106,7 @@ if not OPTIONS["friendly_names"]:
         # "2023-09-21T16:00:00.000Z"
         projclient.update_task(task_start["taskId"], {'start': start.strftime("%Y-%m-%dT16:00:00.000Z")})
 else:
-    print(solution)
+    print(solution.to_json())
     ps.render_gantt_matplotlib(solution)
 
 
