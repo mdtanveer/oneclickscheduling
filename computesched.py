@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 from schedutil import add_working_days_to_date, count_working_days_between_days, str_to_date
 
-OPTIONS = {'friendly_names': True}
+OPTIONS = {'friendly_names': False}
 
 projclient = fetch_full_data()
 
@@ -18,6 +18,7 @@ class ExternalMapping:
         self.tasks = {}
         self.resources = {}
         self.assignments = {}
+        self.assignments_taskId2assId = {}
         self.tasks_json = {}
 
 MAP = ExternalMapping()
@@ -47,11 +48,15 @@ for link in projclient.data["links"]:
 # assignments
 for assignment in projclient.data["assignments"]:
     taskId = assignment['taskId']    
-    resource = MAP.resources[assignment['resourceId']]    
+    resourceId = assignment['resourceId']
+    assignmentId = assignment["id"]
+    resource = MAP.resources[resourceId]    
     if taskId in MAP.assignments.keys():
         MAP.assignments[taskId].append(resource)
+        MAP.assignments_taskId2assId[taskId].append(assignmentId)
     else:
         MAP.assignments[taskId] = [resource]
+        MAP.assignments_taskId2assId[taskId] = [assignmentId]
 for taskId in MAP.tasks.keys():
     task = MAP.tasks[taskId]
     if taskId not in MAP.assignments.keys():
@@ -69,10 +74,19 @@ ps.ObjectiveMinimizeMakespan()
 
 # plot solution
 solver = ps.SchedulingSolver(problem=pb_bs)
+
+for r in MAP.resources.values():
+    res_utilization = ps.IndicatorResourceUtilization(resource=r)
 solution = solver.solve()
 
 if not OPTIONS["friendly_names"]:
     task_solution = json.loads(solution.to_json())
+
+    #clean up multi assignments
+    for taskId in MAP.assignments_taskId2assId.keys():
+        if len(MAP.assignments_taskId2assId[taskId]) > 1:
+            for assId in MAP.assignments_taskId2assId[taskId]:
+                projclient.delete_assignment(assId)
 
     assignments = jmespath.search('tasks.*.{taskId: name, resId: assigned_resources[0]}', task_solution)
     for assignment in assignments:
@@ -90,6 +104,7 @@ if not OPTIONS["friendly_names"]:
         projclient.update_task(task_start["taskId"], {'start': start.strftime("%Y-%m-%dT16:00:00.000Z")})
 else:
     print(solution.to_json())
+    print(solution.indicators)
     ps.render_gantt_matplotlib(solution)
 
 

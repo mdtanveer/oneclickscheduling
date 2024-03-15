@@ -180,6 +180,13 @@ class ProjectClient:
                 },
             headers=self.get_headers_with_authz()
             )
+    
+    def delete_assignment(self, assId):
+        self.open_project()
+        target_url = f"{self.pcs_url}/assignments({assId})"
+        requests.delete(target_url,
+            headers=self.get_headers_with_authz()
+            )
 
 def fetch_full_data():
     proj_client = ProjectClient("db2d4342-5e25-48e2-8755-f9bfd4e6e3fe", "https://msdefault.crm.dynamics.com")
