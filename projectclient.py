@@ -3,6 +3,9 @@ import json
 import pyperclip
 import os, logging
 from pathlib import Path
+import jmespath
+from datetime import datetime
+from schedutil import str_to_date
 
 try:
     import http.client as http_client
@@ -143,6 +146,16 @@ class ProjectClient:
 
     def get_incremental_data(self, revId):
         return self.get_projectdata_helper(f"?$since={revId}")
+
+    def get_day0(self):
+        all_dates =  jmespath.search('[*].start', self.data['tasks'])
+        all_dates = list(filter(lambda x: len(x) != 0, all_dates))
+        all_dates.sort()
+        # "2023-09-21T16:00:00Z"
+        if len(all_dates) == 0:
+            return str_to_date(self.project["projectStart"])
+        else:
+            return str_to_date(all_dates[0])
 
     def update_task(self, taskId, payload):
         self.open_project()

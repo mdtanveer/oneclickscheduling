@@ -3,6 +3,7 @@ import processscheduler as ps
 import jmespath
 import json
 from datetime import datetime
+from schedutil import add_working_days_to_date, count_working_days_between_days, str_to_date
 
 OPTIONS = {'friendly_names': True}
 
@@ -12,37 +13,17 @@ pb_bs = ps.SchedulingProblem(name="1-click scheduling")#,
         #delta_time=timedelta(days=1),
         #start_time = datetime.now())
 
-def add_working_days_to_date(start_date, days_to_add):
-    from datetime import timedelta
-    start_weekday = start_date.weekday()
-
-    # first week
-    total_days = start_weekday + days_to_add
-    if total_days < 5:
-        return start_date + timedelta(days=days_to_add)
-    else:
-        # first week
-        total_days = 7 - start_weekday
-        days_to_add -= 5 - start_weekday
-
-        # middle whole weeks
-        whole_weeks = days_to_add // 5
-        remaining_days = days_to_add % 5
-        total_days += whole_weeks * 7
-        days_to_add -= whole_weeks * 5
-
-        # last week
-        total_days += remaining_days
-
-        return start_date + timedelta(days=total_days)
-
 class ExternalMapping:
     def __init__(self):
         self.tasks = {}
         self.resources = {}
         self.assignments = {}
+        self.tasks_json = {}
 
 MAP = ExternalMapping()
+
+project_day0 = projclient.get_day0()
+print("day0=", project_day0)
 
 # resources
 for resource in projclient.data["resources"]:
@@ -55,7 +36,7 @@ for task in projclient.data["tasks"]:
     taskname = task['name'] if OPTIONS['friendly_names'] else task['id']
     t = ps.FixedDurationTask(name=taskname, duration=int(int(task['duration'])/28800))
     MAP.tasks[task['id']] = t
-    #t.add_required_resource(ps.SelectWorkers(list_of_workers=MAP.resources.values(), nb_workers_to_select=1))
+    MAP.tasks_json[task['id']] = task
 
 # dependencies
 for link in projclient.data["links"]:
@@ -71,14 +52,17 @@ for assignment in projclient.data["assignments"]:
         MAP.assignments[taskId].append(resource)
     else:
         MAP.assignments[taskId] = [resource]
-for taskId in MAP.assignments.keys():
+for taskId in MAP.tasks.keys():
     task = MAP.tasks[taskId]
-    if len(MAP.assignments[taskId]) > 1:
-        task.add_required_resource(ps.SelectWorkers(list_of_workers=MAP.assignments[taskId], nb_workers_to_select=1))
-    elif len(MAP.assignments[taskId]) == 1:
-        task.add_required_resource(MAP.assignments[taskId][0])
-    else:
+    if taskId not in MAP.assignments.keys():
         task.add_required_resource(ps.SelectWorkers(list_of_workers=MAP.resources.values(), nb_workers_to_select=1))
+    else:
+        if len(MAP.assignments[taskId]) > 1:
+            task.add_required_resource(ps.SelectWorkers(list_of_workers=MAP.assignments[taskId], nb_workers_to_select=1))
+        elif len(MAP.assignments[taskId]) == 1:
+            task.add_required_resource(MAP.assignments[taskId][0])
+            taskStart = count_working_days_between_days(project_day0, str_to_date(MAP.tasks_json[taskId]['start']))
+            ps.TaskStartAt(task=task, value=taskStart)
 
 # add makespan objective
 ps.ObjectiveMinimizeMakespan()
@@ -98,9 +82,8 @@ if not OPTIONS["friendly_names"]:
 
     task_starts = jmespath.search('tasks.*.{taskId: name, start: start}', task_solution)
     for task_start in task_starts:
-        project_start = datetime.now()
         start_offset = task_start["start"]
-        start = add_working_days_to_date(project_start, start_offset) 
+        start = add_working_days_to_date(project_day0, start_offset) 
         print(task_start["taskId"], task_start["start"], start)
 
         # "2023-09-21T16:00:00.000Z"

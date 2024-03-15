@@ -53,6 +53,10 @@ ps.ObjectiveMinimizeMakespan()
 
 #ps.ResourceUnavailable(Spandana, [(3,6)])
 solver = ps.SchedulingSolver(problem=pb_bs)
+
+for r in RESOURCES:
+    res_utilization = ps.IndicatorResourceUtilization(resource=r)
 solution = solver.solve()
 ps.render_gantt_matplotlib(solution)
-print(solution.to_json_string())
+print(solution.to_json())
+print(solution.indicators)
