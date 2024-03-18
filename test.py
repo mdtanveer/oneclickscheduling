@@ -33,7 +33,7 @@ ps.TaskPrecedence(task_before=t5, task_after=t6, kind='tight')
 ps.TaskPrecedence(task_before=t8, task_after=t9, kind='tight')
 
 # resource assignment
-t1.add_required_resource(ps.SelectWorkers(list_of_workers=RESOURCES, nb_workers_to_select=1))
+t1.add_required_resource(ps.SelectWorkers(list_of_workers=RESOURCES, nb_workers_to_select=2))
 t2.add_required_resource(ps.SelectWorkers(list_of_workers=RESOURCES, nb_workers_to_select=1))
 t3.add_required_resource(ps.SelectWorkers(list_of_workers=RESOURCES, nb_workers_to_select=1))
 t4.add_required_resource(ps.SelectWorkers(list_of_workers=RESOURCES, nb_workers_to_select=1))
