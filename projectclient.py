@@ -41,7 +41,7 @@ class ProjectClient:
                 "links": None
                 }
         self.data_filters = {
-                "tasks": "/?$select=name,duration,index,summary,start,finish",
+                "tasks": "/?$select=name,duration,index,summary,start,finish,percentComplete,priority",
                 "resources": None,
                 "assignments": "/?$select=taskId,resourceId",
                 "links": "/?$select=driver,predecessorId,successorId,linkType"
@@ -61,7 +61,7 @@ class ProjectClient:
         return {
                 "accept": "application/json, text/javascript, */*; q=0.01",
                 "accept-language": "en-US,en;q=0.9",
-                "authority": "oneproject-ppe-torus-wus-azsc-000.project.microsoft.com",
+                #"authority": "oneproject-ppe-torus-wus-azsc-000.project.microsoft.com",
                 "authorization": None,
                 "content-type": "application/json",
                 "origin": "https://portfolios.officeppe.com",
@@ -90,7 +90,7 @@ class ProjectClient:
 
         headers = self.get_headers()
         headers["authorization"] = f"Bearer {self.aad_token}"
-        x = requests.post("https://portfolios.officeppe.com/pss/api/v1.0/xrm/openproject",
+        x = requests.post("https://project.microsoft.com/pss/api/v1.0/xrm/openproject",
             data=f'{{"xrmUrl":"{self.cdsUrl}","xrmProjectId":"{self.projectId}"}}',
             headers=headers
         )
@@ -118,14 +118,17 @@ class ProjectClient:
             headers=headers,
             cookies={},
             auth=(),
+            verify=False
         )
         x.raise_for_status()
         return x.json()
 
-    def fetch_full_data(self):
+    def fetch_full_data(self, force=False):
         DATA_SUFFIXES = self.data.keys() 
         read_keys = list(DATA_SUFFIXES) + ["project"]
         try:
+            if force:
+                raise FileNotFoundError
             for suffix in read_keys:
                 filename = suffix.split("/")[-1]
                 file = self.work_dir.joinpath(f"{filename}.json")
@@ -162,7 +165,8 @@ class ProjectClient:
         target_url = f"{self.pcs_url}/tasks({taskId})"
         requests.patch(target_url,
             json = payload,
-            headers = self.get_headers_with_authz()
+            headers = self.get_headers_with_authz(),
+            verify=False
             )
 
     def create_assignment(self, taskId, resource):
@@ -188,9 +192,18 @@ class ProjectClient:
             headers=self.get_headers_with_authz()
             )
 
-def fetch_full_data():
-    proj_client = ProjectClient("db2d4342-5e25-48e2-8755-f9bfd4e6e3fe", "https://msdefault.crm.dynamics.com")
-    proj_client.fetch_full_data()
+    def delete_duration(self, taskId):
+        self.open_project()
+        target_url = f"{self.pcs_url}/tasks({taskId})"
+        requests.patch(target_url,
+            json = {"duration": None, "durationDisplayFormat": None},
+            headers = self.get_headers_with_authz(),
+            verify=False
+            )
+
+def fetch_full_data(force_fetch):
+    proj_client = ProjectClient("15830608-3adb-45bc-b4c6-d8808b09ab8c", "https://msdefault.crm.dynamics.com")
+    proj_client.fetch_full_data(force_fetch)
     return proj_client
 
 def fetch_incremental_data():
@@ -201,4 +214,5 @@ def fetch_incremental_data():
     return data
 
 if __name__ == "__main__":
-    projclient = fetch_full_data()
+    #projclient = fetch_incremental_data()
+    projclient = fetch_full_data(force_fetch)
